@@ -349,7 +349,7 @@ extension WebViewController: WKNavigationDelegate {
 
 	func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
 		self.renderPage()
-		UIView.animate(withDuration: 0.1) {
+		UIView.animate(withDuration: 0.2) {
 			webView.alpha = 1
 		}
 	}
