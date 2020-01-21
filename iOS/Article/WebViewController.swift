@@ -24,6 +24,8 @@ class WebViewController: UIViewController {
 		static let imageWasClicked = "imageWasClicked"
 		static let imageWasShown = "imageWasShown"
 	}
+	
+	private let articleIconSchemeHandler = ArticleIconSchemeHandler()
 
 	private var topShowBarsView: UIView!
 	private var bottomShowBarsView: UIView!
@@ -77,17 +79,6 @@ class WebViewController: UIViewController {
 		}
 	}
 	
-	deinit {
-		if webView != nil  {
-			webView?.evaluateJavaScript("cancelImageLoad();")
-			webView.configuration.userContentController.removeScriptMessageHandler(forName: MessageName.imageWasClicked)
-			webView.configuration.userContentController.removeScriptMessageHandler(forName: MessageName.imageWasShown)
-			webView.removeFromSuperview()
-			WebViewProvider.shared.enqueueWebView(webView)
-			webView = nil
-		}
-	}
-
 	override func viewDidLoad() {
 		super.viewDidLoad()
 
@@ -96,39 +87,46 @@ class WebViewController: UIViewController {
 		NotificationCenter.default.addObserver(self, selector: #selector(faviconDidBecomeAvailable(_:)), name: .FaviconDidBecomeAvailable, object: nil)
 		NotificationCenter.default.addObserver(self, selector: #selector(contentSizeCategoryDidChange(_:)), name: UIContentSizeCategory.didChangeNotification, object: nil)
 
-		WebViewProvider.shared.dequeueWebView() { webView in
-			
-			// Add the webview
-			self.webView = webView
-			webView.translatesAutoresizingMaskIntoConstraints = false
-			self.view.addSubview(webView)
-			NSLayoutConstraint.activate([
-				self.view.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
-				self.view.trailingAnchor.constraint(equalTo: webView.trailingAnchor),
-				self.view.topAnchor.constraint(equalTo: webView.topAnchor),
-				self.view.bottomAnchor.constraint(equalTo: webView.bottomAnchor)
-			])
+		// Configure the webview
+		let preferences = WKPreferences()
+		preferences.javaScriptCanOpenWindowsAutomatically = false
+		preferences.javaScriptEnabled = true
 
-			// Configure the tap zones
-			self.configureTopShowBarsView()
-			self.configureBottomShowBarsView()
-			
-			// Configure the webview
-			webView.navigationDelegate = self
-			webView.uiDelegate = self
-			webView.scrollView.delegate = self
-			self.configureContextMenuInteraction()
+		let configuration = WKWebViewConfiguration()
+		configuration.preferences = preferences
+		configuration.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
+		configuration.allowsInlineMediaPlayback = true
+		configuration.mediaTypesRequiringUserActionForPlayback = .video
+		configuration.setURLSchemeHandler(articleIconSchemeHandler, forURLScheme: ArticleRenderer.imageIconScheme)
+		
+		let webView = WKWebView(frame: .zero, configuration: configuration)
 
-			webView.configuration.userContentController.add(WrapperScriptMessageHandler(self), name: MessageName.imageWasClicked)
-			webView.configuration.userContentController.add(WrapperScriptMessageHandler(self), name: MessageName.imageWasShown)
+		// Add the webview
+		self.webView = webView
+		webView.translatesAutoresizingMaskIntoConstraints = false
+		self.view.addSubview(webView)
+		NSLayoutConstraint.activate([
+			self.view.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
+			self.view.trailingAnchor.constraint(equalTo: webView.trailingAnchor),
+			self.view.topAnchor.constraint(equalTo: webView.topAnchor),
+			self.view.bottomAnchor.constraint(equalTo: webView.bottomAnchor)
+		])
 
-			// Even though page.html should be loaded into this webview, we have to do it again
-			// to work around this bug: http://www.openradar.me/22855188
-			self.reloadHTML()
-			
-			self.view.setNeedsLayout()
-			self.view.layoutIfNeeded()
-		}
+		// Configure the tap zones
+		configureTopShowBarsView()
+		configureBottomShowBarsView()
+		
+		// Configure the webview
+		webView.navigationDelegate = self
+		webView.uiDelegate = self
+		webView.scrollView.delegate = self
+		configureContextMenuInteraction()
+
+		webView.configuration.userContentController.add(WrapperScriptMessageHandler(self), name: MessageName.imageWasClicked)
+		webView.configuration.userContentController.add(WrapperScriptMessageHandler(self), name: MessageName.imageWasShown)
+
+		webView.alpha = 0
+		reloadHTML()
 		
 	}
 
@@ -351,6 +349,9 @@ extension WebViewController: WKNavigationDelegate {
 
 	func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
 		self.renderPage()
+		UIView.animate(withDuration: 0.1) {
+			webView.alpha = 1
+		}
 	}
 	
 }
@@ -498,7 +499,7 @@ private extension WebViewController {
 
 		restoreWindowScrollY = 0
 		
-		WebViewProvider.shared.articleIconSchemeHandler.currentArticle = article
+		articleIconSchemeHandler.currentArticle = article
 		webView.scrollView.setZoomScale(1.0, animated: false)
 		webView.evaluateJavaScript(render)
 		
