@@ -27,6 +27,7 @@ public final class Article: Hashable {
 	public let dateModified: Date?
 	public let authors: Set<Author>?
 	public let status: ArticleStatus
+	public let tags:[String]
 
 	public init(accountID: String, articleID: String?, feedID: String, uniqueID: String, title: String?, contentHTML: String?, contentText: String?, url: String?, externalURL: String?, summary: String?, imageURL: String?, datePublished: Date?, dateModified: Date?, authors: Set<Author>?, status: ArticleStatus) {
 		self.accountID = accountID
@@ -43,6 +44,12 @@ public final class Article: Hashable {
 		self.dateModified = dateModified
 		self.authors = authors
 		self.status = status
+		if let title = self.title {
+			self.tags = title.getNouns()
+		}
+		else {
+			self.tags = []
+		}
 		
 		if let articleID = articleID {
 			self.articleID = articleID
